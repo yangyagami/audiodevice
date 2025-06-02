@@ -1,5 +1,6 @@
 #include "alsa_audio_device.h"
 
+#include <iostream>
 #include <vector>
 #include <cassert>
 
@@ -40,16 +41,20 @@ std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
         break;
       }
       default: {
-        return std::make_tuple(kUnknowOpenType, "");
+        return std::make_tuple(kWrongOpenType, "");
       }
     }
     rc = snd_pcm_open(&handle_, device_name.c_str(),
                       stream_type, 0);
     if (rc < 0) {
       std::string error = "Unable to open pcm device: ";
+      error += device_name + ", ";
       error += snd_strerror(rc);
+      error += ", rc: ";
+      error += std::to_string(rc);
+
       return std::make_tuple(
-          static_cast<Error>(kBackendError + rc), error);
+          static_cast<Error>(kUnknownError), error);
     }
 
     snd_pcm_hw_params_alloca(&params_);
@@ -103,10 +108,13 @@ std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
 
     rc = snd_pcm_hw_params(handle_, params_);
     if (rc < 0) {
-      std::string error = "Unable to set HW parameters: ";
+      std::string error = "Unable to set HW parameters, ";
       error += snd_strerror(rc);
+      error += ", rc: ";
+      error += std::to_string(rc);
+
       return std::make_tuple(
-          static_cast<Error>(kBackendError + rc), error);
+          static_cast<Error>(kUnknownError), error);
     }
 
     audio_format_->sample_rate = sample_rate;
@@ -145,14 +153,26 @@ void AlsaAudioDevice::SetPeriodTime(
 }
 
 void AlsaAudioDevice::Write(const void *data, size_t frames) {
+  assert(handle_);
+
   if (open_type_ == kPlayer) {
+    snd_pcm_state_t state = snd_pcm_state(handle_);
+
+    if (state != SND_PCM_STATE_PREPARED || state != SND_PCM_STATE_RUNNING) {
+      snd_pcm_prepare(handle_);
+    }
+
     int rc = snd_pcm_writei(handle_, data, frames);
+
+    // TODO(yangsiyu): Handle return code.
   }
 }
 
 void AlsaAudioDevice::Write(const void *data,
                             const std::chrono::milliseconds &duration) {
-  if (open_type_ == kPlayer) {
+  assert(handle_);
+
+  if (open_type_ == kPlayer && duration.count() > 0) {
     Write(data, audio_format_->sample_rate * duration.count() / 1000);
   }
 }
@@ -162,8 +182,18 @@ void AlsaAudioDevice::Read(void *buffer,
 
 }
 
-void AlsaAudioDevice::Read(void *buffer, int frames) {
+void AlsaAudioDevice::Read(void *buffer, int frames) {}
 
+void AlsaAudioDevice::Stop() {
+  assert(handle_);
+
+  if (open_type_ == kPlayer) {
+    std::cout << "before: " << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
+    snd_pcm_drop(handle_);
+    std::cout << " " << snd_pcm_prepare(handle_) << std::endl;
+    std::cout << " " << snd_pcm_start(handle_) << std::endl;
+    std::cout << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
+  }
 }
 
 }  // namespace audiodevice

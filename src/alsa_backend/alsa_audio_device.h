@@ -22,9 +22,8 @@ class AlsaAudioDevice {
   enum Error {
     kNoError = 0,
     kAlreadyOpened,
-    kUnknowOpenType,
-
-    kBackendError = 1000,
+    kWrongOpenType,
+    kUnknownError,
   };
 
   enum State {
@@ -48,6 +47,7 @@ class AlsaAudioDevice {
 
   void Read(void *buffer, const std::chrono::milliseconds &duration);
   void Read(void *buffer, int frames);
+  void Stop();
 
   State state() const { return state_; }
 
