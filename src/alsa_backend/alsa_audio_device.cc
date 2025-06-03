@@ -13,16 +13,13 @@ using namespace std::chrono_literals;
 namespace audiodevice {
 
 AlsaAudioDevice::AlsaAudioDevice(AudioFormat *format)
-    : audio_format_(format) {
-  buffer_time_ = 0ms;
-  period_time_ = 0ms;
-}
+    : AudioDevice(format) {}
 
 AlsaAudioDevice::~AlsaAudioDevice() {
   Close();
 }
 
-std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
+std::tuple<AudioDevice::Error, std::string> AlsaAudioDevice::Open(
     const std::string &device_name,
     OpenType open_type) {
   if (!handle_ && !params_ && state_ != kRunning) {
@@ -32,16 +29,16 @@ std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
     snd_pcm_stream_t stream_type;
     // 打开 PCM 设备
     switch (open_type) {
-      case kRecorder: {
+      case AudioDevice::kRecorder: {
         stream_type = SND_PCM_STREAM_CAPTURE;
         break;
       }
-      case kPlayer: {
+      case AudioDevice::kPlayer: {
         stream_type = SND_PCM_STREAM_PLAYBACK;
         break;
       }
       default: {
-        return std::make_tuple(kWrongOpenType, "");
+        return std::make_tuple(AudioDevice::kWrongOpenType, "");
       }
     }
     rc = snd_pcm_open(&handle_, device_name.c_str(),
@@ -54,7 +51,7 @@ std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
       error += std::to_string(rc);
 
       return std::make_tuple(
-          static_cast<Error>(kUnknownError), error);
+          static_cast<Error>(AudioDevice::kUnknownError), error);
     }
 
     snd_pcm_hw_params_alloca(&params_);
@@ -114,18 +111,18 @@ std::tuple<AlsaAudioDevice::Error, std::string> AlsaAudioDevice::Open(
       error += std::to_string(rc);
 
       return std::make_tuple(
-          static_cast<Error>(kUnknownError), error);
+          static_cast<Error>(AudioDevice::kUnknownError), error);
     }
 
     audio_format_->sample_rate = sample_rate;
   } else {
-    return std::make_tuple(kAlreadyOpened, "");
+    return std::make_tuple(AudioDevice::kAlreadyOpened, "");
   }
 
   open_type_ = open_type;
   state_ = kRunning;
 
-  return std::make_tuple(kNoError, "");
+  return std::make_tuple(AudioDevice::kNoError, "");
 }
 
 void AlsaAudioDevice::Close() {
@@ -152,13 +149,13 @@ void AlsaAudioDevice::SetPeriodTime(
   period_time_ = period_time;
 }
 
-void AlsaAudioDevice::Write(const void *data, size_t frames) {
+AudioDevice::Error AlsaAudioDevice::Write(const void *data, size_t frames) {
   assert(handle_);
 
   if (open_type_ == kPlayer) {
     snd_pcm_state_t state = snd_pcm_state(handle_);
 
-    if (state != SND_PCM_STATE_PREPARED || state != SND_PCM_STATE_RUNNING) {
+    if (state != SND_PCM_STATE_PREPARED && state != SND_PCM_STATE_RUNNING) {
       snd_pcm_prepare(handle_);
     }
 
@@ -166,32 +163,53 @@ void AlsaAudioDevice::Write(const void *data, size_t frames) {
 
     // TODO(yangsiyu): Handle return code.
   }
+
+  return AudioDevice::kNoError;
 }
 
-void AlsaAudioDevice::Write(const void *data,
+AudioDevice::Error AlsaAudioDevice::Write(const void *data,
                             const std::chrono::milliseconds &duration) {
   assert(handle_);
 
   if (open_type_ == kPlayer && duration.count() > 0) {
     Write(data, audio_format_->sample_rate * duration.count() / 1000);
   }
+
+  return AudioDevice::kNoError;
 }
 
-void AlsaAudioDevice::Read(void *buffer,
+AudioDevice::Error AlsaAudioDevice::Write(const void *data,
+                                          const std::chrono::seconds &duration) {
+  assert(handle_);
+
+  if (open_type_ == kPlayer && duration.count() > 0) {
+    Write(data, audio_format_->sample_rate * duration.count());
+  }
+
+  return AudioDevice::kNoError;
+}
+
+AudioDevice::Error AlsaAudioDevice::Read(void *buffer,
                            const std::chrono::milliseconds &duration) {
-
+  return AudioDevice::kNoError;
 }
 
-void AlsaAudioDevice::Read(void *buffer, int frames) {}
+AudioDevice::Error AlsaAudioDevice::Read(void *buffer, int frames) {
+  return AudioDevice::kNoError;
+}
+
+void AlsaAudioDevice::Drain() {
+  assert(handle_);
+  if (open_type_ != kNone) {
+    snd_pcm_drain(handle_);
+  }
+}
 
 void AlsaAudioDevice::Stop() {
   assert(handle_);
 
   if (open_type_ == kPlayer) {
-    std::cout << "before: " << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
     snd_pcm_drop(handle_);
-    std::cout << " " << snd_pcm_prepare(handle_) << std::endl;
-    std::cout << " " << snd_pcm_start(handle_) << std::endl;
     std::cout << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
   }
 }

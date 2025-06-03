@@ -8,57 +8,33 @@
 #include <alsa/asoundlib.h>
 
 #include "audio_format.h"
+#include "audiodevice.h"
 
 namespace audiodevice {
 
-class AlsaAudioDevice {
+class AlsaAudioDevice : public AudioDevice {
  public:
-  enum OpenType {
-    kNone = 0,
-    kRecorder,
-    kPlayer,
-  };
-
-  enum Error {
-    kNoError = 0,
-    kAlreadyOpened,
-    kWrongOpenType,
-    kUnknownError,
-  };
-
-  enum State {
-    kRunning = 0,
-    kClosed,
-  };
-
   AlsaAudioDevice(AudioFormat *format);
-  ~AlsaAudioDevice();
+  virtual ~AlsaAudioDevice();
 
   std::tuple<Error, std::string> Open(const std::string &device_name,
-                                      OpenType device_type);
-  void Close();
+                                      OpenType device_type) override;
+  void Close() override;
 
-  void SetBufferTime(const std::chrono::milliseconds &buffer_time);
-  void SetPeriodTime(const std::chrono::milliseconds &period_time);
+  void SetBufferTime(const std::chrono::milliseconds &buffer_time) override;
+  void SetPeriodTime(const std::chrono::milliseconds &period_time) override;
 
-  void Write(const void *data, size_t frames);
-  void Write(const void *data, const std::chrono::milliseconds &duration);
-  void Write(const void *data, const std::chrono::seconds &duration);
+  Error Write(const void *data, size_t frames) override;
+  Error Write(const void *data, const std::chrono::milliseconds &duration) override;
+  Error Write(const void *data, const std::chrono::seconds &duration) override;
 
-  void Read(void *buffer, const std::chrono::milliseconds &duration);
-  void Read(void *buffer, int frames);
-  void Stop();
+  Error Read(void *buffer, const std::chrono::milliseconds &duration) override;
+  Error Read(void *buffer, int frames) override;
 
-  State state() const { return state_; }
+  void Drain() override;
+  void Stop() override;
 
  private:
-  AudioFormat *audio_format_ = nullptr;
-  OpenType open_type_ = kNone;
-  State state_ = kClosed;
-
-  std::chrono::milliseconds buffer_time_;
-  std::chrono::milliseconds period_time_;
-
   snd_pcm_t *handle_ = nullptr;
   snd_pcm_hw_params_t *params_ = nullptr;
 };

@@ -1,67 +1,13 @@
-// #include <iostream>
-// #include <cmath>
-// #include <chrono>
-// #include <thread>
-
-// #include <alsa/asoundlib.h>
-
-// #include "alsa_backend/alsa_audio_device.h"
-// #include "audio_format.h"
-
-// #define SAMPLE_RATE 44100
-// #define FREQUENCY 440.0 // A4 note
-// #define DURATION 5.0    // seconds
-
-// using namespace std::chrono_literals;
-
-// int main() {
-//   // 计算样本数
-//   int samples = static_cast<int>(DURATION * SAMPLE_RATE);
-//   int16_t *buffer = new int16_t[samples];
-
-//   // 生成正弦波
-//   for (int i = 0; i < samples; ++i) {
-//     buffer[i] = static_cast<int16_t>(32767 * sin(2 * M_PI * FREQUENCY * i / SAMPLE_RATE));
-//   }
-
-//   audiodevice::AudioFormat audio_format;
-//   audio_format.sample_rate = 44100;
-//   audio_format.bit_depth = 16;
-
-//   audiodevice::AlsaAudioDevice player(&audio_format);
-//   auto [error, msg] = player.Open("default", audiodevice::AlsaAudioDevice::kPlayer);
-
-//   if (error != audiodevice::AlsaAudioDevice::kNoError) {
-//     std::cout << error << ": " << msg << std::endl;
-//     delete[] buffer;
-//     return -1;
-//   }
-
-//   // std::thread t([&](){
-//   //   std::this_thread::sleep_for(800ms);
-//   //   player.Stop();
-//   // });
-
-//   auto start = std::chrono::high_resolution_clock::now();
-//   player.Write(buffer, 0ms);
-//   player.Write(buffer, 0ms);
-//   auto end = std::chrono::high_resolution_clock::now();
-//   // 计算持续时间
-//   std::chrono::duration<double> duration = end - start;
-
-//   // 输出执行时间（秒）
-//   std::cout << "执行时间: " << duration.count() << " 秒" << std::endl;
-
-//   // t.join();
-//   delete[] buffer;
-//   return 0;
-// }
-
 #include <iostream>
 #include <cmath>
+#include <chrono>
 #include <thread>
 
 #include <alsa/asoundlib.h>
+
+#include "audiodevice_creator.h"
+#include "audiodevice.h"
+#include "audio_format.h"
 
 #define SAMPLE_RATE 44100
 #define FREQUENCY 440.0 // A4 note
@@ -70,58 +16,120 @@
 using namespace std::chrono_literals;
 
 int main() {
-    snd_pcm_t *handle;
-    snd_pcm_hw_params_t *params;
-    unsigned int rate = SAMPLE_RATE;
-    int dir;
-    int pcm;
+  // 计算样本数
+  int samples = static_cast<int>(DURATION * SAMPLE_RATE);
+  int16_t *buffer = new int16_t[samples];
 
-    pcm = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
-    if (pcm < 0) {
-        std::cerr << "Unable to open PCM device: " << snd_strerror(pcm) << std::endl;
-        return 1;
-    }
+  // 生成正弦波
+  for (int i = 0; i < samples; ++i) {
+    buffer[i] = static_cast<int16_t>(32767 * sin(2 * M_PI * FREQUENCY * i / SAMPLE_RATE));
+  }
 
-    snd_pcm_hw_params_alloca(&params);
-    snd_pcm_hw_params_any(handle, params);
+  audiodevice::AudioFormat audio_format;
+  audio_format.sample_rate = 44100;
+  audio_format.bit_depth = 16;
 
-    snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
-    snd_pcm_hw_params_set_format(handle, params, SND_PCM_FORMAT_S16_LE);
-    snd_pcm_hw_params_set_rate_near(handle, params, &rate, &dir);
-    snd_pcm_hw_params_set_channels(handle, params, 1);
+  audiodevice::AudioDeviceCreator audiodevice_creator;
 
-    pcm = snd_pcm_hw_params(handle, params);
-    if (pcm < 0) {
-        std::cerr << "Unable to set HW parameters: " << snd_strerror(pcm) << std::endl;
-        return 1;
-    }
+  audiodevice::AudioDevice *player = audiodevice_creator.Create(
+      audiodevice::AudioDeviceCreator::kAlsa,
+      &audio_format);
 
-    int samples = static_cast<int>(DURATION * SAMPLE_RATE);
-    int16_t *buffer = new int16_t[samples];
+  auto [error, msg] = player->Open("default", audiodevice::AudioDevice::kPlayer);
 
-    for (int i = 0; i < samples; ++i) {
-        buffer[i] = static_cast<int16_t>(32767 * sin(2 * M_PI * FREQUENCY * i / SAMPLE_RATE));
-    }
-
-    pcm = snd_pcm_writei(handle, buffer, samples);
-    if (pcm < 0) {
-        std::cerr << "Playback error: " << snd_strerror(pcm) << std::endl;
-    }
-
-    std::thread t([handle](){
-      std::this_thread::sleep_for(500ms);
-      snd_pcm_drop(handle);
-    });
-
-    snd_pcm_drain(handle);
-
-    t.join();
-
+  if (error != audiodevice::AudioDevice::kNoError) {
+    std::cout << error << ": " << msg << std::endl;
     delete[] buffer;
-    snd_pcm_close(handle);
+    return -1;
+  }
 
-    return 0;
+  // std::thread t([&](){
+  //   std::this_thread::sleep_for(800ms);
+  //   player.Stop();
+  // });
+  // t.detach();
+
+  auto start = std::chrono::high_resolution_clock::now();
+  player->Write(buffer, 10ms);
+  // player->Drain();
+  // player.Write(buffer, 2000ms);
+  auto end = std::chrono::high_resolution_clock::now();
+  // 计算持续时间
+  std::chrono::duration<double> duration = end - start;
+
+  // 输出执行时间（秒）
+  std::cout << "执行时间: " << duration.count() << " 秒" << std::endl;
+
+  delete player;
+  delete[] buffer;
+  return 0;
 }
+
+// #include <iostream>
+// #include <cmath>
+// #include <thread>
+
+// #include <alsa/asoundlib.h>
+
+// #define SAMPLE_RATE 44100
+// #define FREQUENCY 440.0 // A4 note
+// #define DURATION 5.0    // seconds
+
+// using namespace std::chrono_literals;
+
+// int main() {
+//     snd_pcm_t *handle;
+//     snd_pcm_hw_params_t *params;
+//     unsigned int rate = SAMPLE_RATE;
+//     int dir;
+//     int pcm;
+
+//     pcm = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+//     if (pcm < 0) {
+//         std::cerr << "Unable to open PCM device: " << snd_strerror(pcm) << std::endl;
+//         return 1;
+//     }
+
+//     snd_pcm_hw_params_alloca(&params);
+//     snd_pcm_hw_params_any(handle, params);
+
+//     snd_pcm_hw_params_set_access(handle, params, SND_PCM_ACCESS_RW_INTERLEAVED);
+//     snd_pcm_hw_params_set_format(handle, params, SND_PCM_FORMAT_S16_LE);
+//     snd_pcm_hw_params_set_rate_near(handle, params, &rate, &dir);
+//     snd_pcm_hw_params_set_channels(handle, params, 1);
+
+//     pcm = snd_pcm_hw_params(handle, params);
+//     if (pcm < 0) {
+//         std::cerr << "Unable to set HW parameters: " << snd_strerror(pcm) << std::endl;
+//         return 1;
+//     }
+
+//     int samples = static_cast<int>(DURATION * SAMPLE_RATE);
+//     int16_t *buffer = new int16_t[samples];
+
+//     for (int i = 0; i < samples; ++i) {
+//         buffer[i] = static_cast<int16_t>(32767 * sin(2 * M_PI * FREQUENCY * i / SAMPLE_RATE));
+//     }
+
+//     pcm = snd_pcm_writei(handle, buffer, samples);
+//     if (pcm < 0) {
+//         std::cerr << "Playback error: " << snd_strerror(pcm) << std::endl;
+//     }
+
+//     std::thread t([handle](){
+//       std::this_thread::sleep_for(500ms);
+//       snd_pcm_drop(handle);
+//     });
+
+//     snd_pcm_drain(handle);
+
+//     t.join();
+
+//     delete[] buffer;
+//     snd_pcm_close(handle);
+
+//     return 0;
+// }
 
 // #include <alsa/asoundlib.h>
 
