@@ -34,6 +34,8 @@ class AlsaAudioDevice : public AudioDevice {
   void Drain() override;
   void Stop() override;
 
+  State state() override;
+
  private:
   snd_pcm_t *handle_ = nullptr;
   snd_pcm_hw_params_t *params_ = nullptr;

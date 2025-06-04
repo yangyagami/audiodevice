@@ -15,9 +15,9 @@ struct AudioFormat {
     kBigEndian,
   };
 
-  int sample_rate;
-  int channels;
-  int bit_depth;
+  size_t sample_rate;
+  size_t channels;
+  size_t bit_depth;
   SampleFormat sample_format;
   ByteOrder byte_order;
 

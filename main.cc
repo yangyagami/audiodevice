@@ -50,20 +50,38 @@ int main() {
   // t.detach();
 
   auto start = std::chrono::high_resolution_clock::now();
-  player->Write(buffer, 10ms);
-  // player->Drain();
-  // player.Write(buffer, 2000ms);
-  auto end = std::chrono::high_resolution_clock::now();
-  // 计算持续时间
-  std::chrono::duration<double> duration = end - start;
+  if (player->state() == audiodevice::AudioDevice::kIdle) {
+    auto total_audio_time_ms = player->ConvertFramesToTimeMS(samples);
+    std::cout << "总时间: " << total_audio_time_ms.count() << "ms" << std::endl;
+    player->Write(buffer, total_audio_time_ms);
+    start = std::chrono::high_resolution_clock::now();
+  }
 
-  // 输出执行时间（秒）
-  std::cout << "执行时间: " << duration.count() << " 秒" << std::endl;
+  bool loop = true;
+  while (loop) {
+    switch (player->state()) {
+      case audiodevice::AudioDevice::kRunning: {
+        // Playing
+        auto end = std::chrono::high_resolution_clock::now();
+        auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(
+            end - start);
+        std::cout << "经过: " << dt.count() << "ms" << std::endl;
+        if (dt >= 5000ms) {
+          std::cout << "播放完成" << std::endl;
+          loop = false;
+        }
+        break;
+      }
+    }
+    std::this_thread::sleep_for(20ms);
+  }
 
   delete player;
   delete[] buffer;
   return 0;
 }
+
+// #include <stdio.h>
 
 // #include <iostream>
 // #include <cmath>
@@ -111,19 +129,56 @@ int main() {
 //         buffer[i] = static_cast<int16_t>(32767 * sin(2 * M_PI * FREQUENCY * i / SAMPLE_RATE));
 //     }
 
-//     pcm = snd_pcm_writei(handle, buffer, samples);
-//     if (pcm < 0) {
+//     auto start = std::chrono::high_resolution_clock::now();;
+
+//     if (snd_pcm_state(handle) != SND_PCM_STATE_RUNNING) {
+//       pcm = snd_pcm_writei(handle, buffer, samples);
+//       if (pcm < 0) {
 //         std::cerr << "Playback error: " << snd_strerror(pcm) << std::endl;
+//       }
+//       start = std::chrono::high_resolution_clock::now();;
 //     }
 
-//     std::thread t([handle](){
-//       std::this_thread::sleep_for(500ms);
-//       snd_pcm_drop(handle);
-//     });
+//     // std::thread t([handle](){
+//     //   std::this_thread::sleep_for(1s);
+//     //   snd_pcm_drop(handle);
+//     // });
+//     // t.detach();
+
+//     bool loop = true;
+//     while (loop) {
+//       // snd_pcm_sframes_t delay;
+//       // snd_pcm_delay(handle, &delay);
+//       std::cout << snd_pcm_state_name(snd_pcm_state(handle)) << std::endl;
+
+//       switch (snd_pcm_state(handle)) {
+//         case SND_PCM_STATE_SETUP: {
+//           // STOPPED
+//           std::cout << "停止播放" << std::endl;
+//           break;
+//         }
+//         case SND_PCM_STATE_XRUN: {
+//           // Play finished
+//           std::cout << "播放完成" << std::endl;
+//           break;
+//         }
+//         case SND_PCM_STATE_RUNNING: {
+//           // Playing
+//           auto end = std::chrono::high_resolution_clock::now();
+//           auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(
+//               end - start);
+//           std::cout << "经过: " << dt.count() << "ms" << std::endl;
+//           if (dt >= 5000ms) {
+//             std::cout << "播放完成" << std::endl;
+//             loop = false;
+//           }
+//           break;
+//         }
+//       }
+//       std::this_thread::sleep_for(20ms);
+//     }
 
 //     snd_pcm_drain(handle);
-
-//     t.join();
 
 //     delete[] buffer;
 //     snd_pcm_close(handle);

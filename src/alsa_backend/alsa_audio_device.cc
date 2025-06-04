@@ -23,7 +23,7 @@ std::tuple<AudioDevice::Error, std::string> AlsaAudioDevice::Open(
     const std::string &device_name,
     OpenType open_type) {
   if (!handle_ && !params_ && state_ != kRunning) {
-    int dir;
+    int dir = 0;
     int rc;
 
     snd_pcm_stream_t stream_type;
@@ -159,6 +159,7 @@ AudioDevice::Error AlsaAudioDevice::Write(const void *data, size_t frames) {
       snd_pcm_prepare(handle_);
     }
 
+    std::cout << frames << std::endl;
     int rc = snd_pcm_writei(handle_, data, frames);
 
     // TODO(yangsiyu): Handle return code.
@@ -212,6 +213,30 @@ void AlsaAudioDevice::Stop() {
     snd_pcm_drop(handle_);
     std::cout << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
   }
+}
+
+AudioDevice::State AlsaAudioDevice::state() {
+  assert(handle_);
+
+  switch (snd_pcm_state(handle_)) {
+    case SND_PCM_STATE_OPEN:
+    case SND_PCM_STATE_XRUN:
+    case SND_PCM_STATE_SETUP:
+    case SND_PCM_STATE_PREPARED: {
+      state_ = AudioDevice::kIdle;
+      break;
+    }
+    case SND_PCM_STATE_RUNNING: {
+      state_ = AudioDevice::kRunning;
+      break;
+    }
+    default: {
+      // TODO(yangsiyu): Handle remain status
+      break;
+    }
+  }
+
+  return state_;
 }
 
 }  // namespace audiodevice

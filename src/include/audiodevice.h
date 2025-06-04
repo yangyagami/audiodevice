@@ -4,6 +4,7 @@
 #include <tuple>
 #include <chrono>
 #include <string>
+#include <cstdint>
 
 #include "audio_format.h"
 
@@ -25,7 +26,8 @@ class AudioDevice {
   };
 
   enum State {
-    kRunning = 0,
+    kIdle = 0,
+    kRunning,
     kClosed,
   };
 
@@ -52,7 +54,12 @@ class AudioDevice {
   virtual void Drain() = 0;
   virtual void Stop() = 0;
 
-  State state() const;
+  size_t ConvertBytesSizeToFrames(size_t size);
+  std::chrono::milliseconds ConvertBytesSizeToTimeMS(size_t size);
+  std::chrono::seconds ConvertBytesSizeToTimeSec(size_t size);
+  std::chrono::milliseconds ConvertFramesToTimeMS(size_t frames);
+
+  virtual State state() = 0;
 
  protected:
   AudioFormat *audio_format_;
