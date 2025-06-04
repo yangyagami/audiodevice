@@ -28,7 +28,7 @@ size_t AudioDevice::ConvertBytesSizeToFrames(size_t size) {
 std::chrono::milliseconds AudioDevice::ConvertBytesSizeToTimeMS(size_t size) {
   assert(audio_format_);
 
-  return std::chrono::milliseconds(ConvertBytesSizeToTimeSec(size) / 1000);
+  return std::chrono::milliseconds(ConvertBytesSizeToTimeSec(size) * 1000);
 }
 
 std::chrono::seconds AudioDevice::ConvertBytesSizeToTimeSec(size_t size) {
