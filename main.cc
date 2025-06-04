@@ -10,8 +10,8 @@
 #include "audio_format.h"
 
 #define SAMPLE_RATE 44100
-#define FREQUENCY 440.0 // A4 note
-#define DURATION 5.0    // seconds
+#define FREQUENCY 440.0   // A4 note
+#define DURATION 5.322    // seconds
 
 using namespace std::chrono_literals;
 

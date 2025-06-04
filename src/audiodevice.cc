@@ -37,13 +37,15 @@ std::chrono::seconds AudioDevice::ConvertBytesSizeToTimeSec(size_t size) {
 
   size_t frames = ConvertBytesSizeToFrames(size);
 
-  return std::chrono::seconds(frames / audio_format_->sample_rate);
+  return std::chrono::seconds(
+      int64_t(frames / double(audio_format_->sample_rate)));
 }
 
 std::chrono::milliseconds AudioDevice::ConvertFramesToTimeMS(size_t frames) {
   assert(audio_format_);
 
-  return std::chrono::milliseconds(frames / audio_format_->sample_rate * 1000);
+  return std::chrono::milliseconds(
+      int64_t(frames / double(audio_format_->sample_rate) * 1000));
 }
 
 }  // namespace audiodevice
