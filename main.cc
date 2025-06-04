@@ -43,11 +43,11 @@ int main() {
     return -1;
   }
 
-  // std::thread t([&](){
-  //   std::this_thread::sleep_for(800ms);
-  //   player.Stop();
-  // });
-  // t.detach();
+  std::thread t([&](){
+    std::this_thread::sleep_for(800ms);
+    player->Stop();
+  });
+  t.detach();
 
   auto start = std::chrono::high_resolution_clock::now();
   if (player->state() == audiodevice::AudioDevice::kIdle) {

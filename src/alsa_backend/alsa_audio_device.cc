@@ -159,8 +159,19 @@ AudioDevice::Error AlsaAudioDevice::Write(const void *data, size_t frames) {
       snd_pcm_prepare(handle_);
     }
 
-    std::cout << frames << std::endl;
+    std::cout << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
+
     int rc = snd_pcm_writei(handle_, data, frames);
+
+    if (rc < 0) {
+      std::cout << "write failed state:" << snd_pcm_state_name(snd_pcm_state(handle_)) << std::endl;
+      rc = snd_pcm_recover(handle_, rc, 0);
+      if (rc < 0) {
+        std::cerr << "pcm write failed: " << snd_strerror(rc) << std::endl;
+      } else {
+        rc = snd_pcm_writei(handle_, data, frames);
+      }
+    }
 
     // TODO(yangsiyu): Handle return code.
   }
@@ -220,7 +231,6 @@ AudioDevice::State AlsaAudioDevice::state() {
 
   switch (snd_pcm_state(handle_)) {
     case SND_PCM_STATE_OPEN:
-    case SND_PCM_STATE_XRUN:
     case SND_PCM_STATE_SETUP:
     case SND_PCM_STATE_PREPARED: {
       state_ = AudioDevice::kIdle;
